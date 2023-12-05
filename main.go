@@ -3,14 +3,15 @@ package main
 import (
 	"context"
 	"log"
-	"time"
 )
 
-const documents = 50000
+const (
+	documents = 1500000
+	batchSize = 1000
+)
 
 func main() {
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-	defer cancel()
+	ctx := context.Background()
 
 	db := newDbConn(ctx)
 	defer db.client.Disconnect(ctx)

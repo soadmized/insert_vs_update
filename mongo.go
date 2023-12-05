@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/pkg/errors"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -44,12 +45,29 @@ func newDbConn(ctx context.Context) dbConn {
 
 func (db *dbConn) insertManyDocs(ctx context.Context) {
 	docs := prepareDocs()
+	batch := make([]interface{}, 0, batchSize)
 
 	start := time.Now()
-	_, err := db.coll.InsertMany(ctx, docs)
-	if err != nil {
-		log.Fatal(err)
+	for _, d := range docs {
+		batch = append(batch, d)
+
+		if len(batch) >= batchSize {
+			_, err := db.coll.InsertMany(ctx, batch)
+			if err != nil {
+				log.Fatal(errors.Wrap(err, "insert many"))
+			}
+
+			batch = batch[:0]
+		}
 	}
+
+	if len(batch) > 0 {
+		_, err := db.coll.InsertMany(ctx, batch)
+		if err != nil {
+			log.Fatal(errors.Wrap(err, "insert many out of for loop"))
+		}
+	}
+
 	log.Print("INSERT MANY TIME: ", -start.Sub(time.Now()))
 }
 
@@ -64,12 +82,29 @@ func (db *dbConn) updateManyDocs(ctx context.Context) {
 	}
 
 	models := mongoWriteModels(prDocs)
+	batch := make([]mongo.WriteModel, 0, batchSize)
 
 	start := time.Now()
-	_, err := db.coll.BulkWrite(ctx, models)
-	if err != nil {
-		log.Fatal(err)
+	for _, m := range models {
+		batch = append(batch, m)
+
+		if len(batch) >= batchSize {
+			_, err := db.coll.BulkWrite(ctx, batch)
+			if err != nil {
+				log.Fatal(errors.Wrap(err, "update many"))
+			}
+
+			batch = batch[:0]
+		}
 	}
+
+	if len(batch) > 0 {
+		_, err := db.coll.BulkWrite(ctx, batch)
+		if err != nil {
+			log.Fatal(errors.Wrap(err, "update many out of for loop"))
+		}
+	}
+
 	log.Print("BULK WRITE TIME: ", -start.Sub(time.Now()))
 }
 
